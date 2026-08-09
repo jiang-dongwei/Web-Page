@@ -3,21 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>留言板</title>
+<title>系统停止运行</title>
 <style>
   :root { color-scheme: light; font-family: ui-rounded, "Microsoft YaHei", system-ui, sans-serif; }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; color: #243044; background: radial-gradient(circle at 10% 5%, #ffe7b8 0, transparent 28rem), radial-gradient(circle at 90% 10%, #dbe9ff 0, transparent 26rem), #f8f6f1; }
   main { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 52px 0 72px; }
-  .card { background: rgba(255,255,255,.87); border: 1px solid rgba(36,48,68,.1); border-radius: 24px; box-shadow: 0 18px 48px rgba(39,61,99,.12); padding: 26px; backdrop-filter: blur(10px); }
+  .card { background: rgba(255,255,255,.9); border: 1px solid rgba(36,48,68,.1); border-radius: 24px; box-shadow: 0 18px 48px rgba(39,61,99,.12); padding: 26px; backdrop-filter: blur(10px); }
   .gate { max-width: 480px; margin: 12vh auto; text-align: center; }
-  h1 { margin: 0 0 8px; font-size: clamp(28px, 6vw, 42px); letter-spacing: -.04em; }
+  h1 { margin: 0 0 8px; font-size: clamp(28px, 6vw, 42px); letter-spacing: -.02em; }
   h2 { margin: 0; font-size: 20px; }
   p { color: #647087; line-height: 1.65; }
   label { display: block; text-align: left; margin: 22px 0 8px; font-size: 14px; color: #58657a; font-weight: 700; }
-  input, textarea { width: 100%; border: 1px solid #d8ddea; background: #fff; border-radius: 14px; padding: 14px 15px; color: #243044; font: inherit; outline: none; }
-  input:focus, textarea:focus { border-color: #6b8ef6; box-shadow: 0 0 0 4px #dfe8ff; }
-  textarea { min-height: 112px; resize: vertical; }
+  input { width: 100%; border: 1px solid #d8ddea; background: #fff; border-radius: 14px; padding: 14px 15px; color: #243044; font: inherit; outline: none; }
+  input:focus { border-color: #6b8ef6; box-shadow: 0 0 0 4px #dfe8ff; }
   button { border: 0; border-radius: 14px; padding: 13px 18px; margin-top: 12px; background: #4267db; color: white; font: inherit; font-weight: 800; cursor: pointer; }
   button:hover { background: #3459ca; }
   button:disabled { opacity: .6; cursor: wait; }
@@ -25,7 +24,7 @@
   .identity { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
   .avatar { display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 auto; border-radius: 18px; font-size: 28px; background: #edf2ff; }
   .identity small { display: block; margin-top: 3px; color: #7b8799; }
-  .composer { margin-bottom: 20px; }
+  .notice { margin: 20px 0 22px; padding: 18px; border-radius: 18px; background: #fff7d6; border: 1px solid #f1d77a; color: #5f4a00; font-weight: 800; }
   .message { padding: 17px 0; border-top: 1px solid #ebedf3; }
   .message-head { display: flex; align-items: center; gap: 9px; }
   .message-head .avatar { width: 32px; height: 32px; border-radius: 11px; font-size: 18px; }
@@ -39,18 +38,12 @@
 <body>
 <div id="app"><main><section class="card"><div class="busy">连接中…</div></section></main></div>
 
-<!-- Supabase 客户端（jsdelivr CDN，国内一般可访问） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
 
-// ============================================================================
-// 配置区 —— 部署前必填：粘贴你的 Supabase 项目地址和 anon 公钥
-// 位置：supabase.com 控制台 -> Project Settings -> API
-// ============================================================================
 const SUPABASE_URL = "https://bhmlgrhskpxgmmujvkac.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_kL6hYQS5Hx2RniZIkTRFxw_C_KcYBsh";
-// ============================================================================
 
 const PERSONAS = [
   ["月亮邮差", "🌙"], ["云朵同学", "☁️"], ["橘子汽水", "🍊"], ["小熊电台", "🐻"], ["星星旅人", "⭐"],
@@ -64,13 +57,12 @@ const PERSONAS = [
   ["灯塔守夜", "🗼"], ["落叶信笺", "🍂"], ["海浪面包", "🥖"], ["铃兰花语", "🔔"], ["蜂鸟送信", "🐦"],
   ["葡萄汽水", "🍇"], ["蜂蜜松糕", "🐝"], ["夜灯蘑菇", "🍄"], ["青柠苏打", "🥤"], ["森林指南针", "🧭"],
 ];
-const DAILY_MESSAGE_LIMIT = 3;
+const ADMIN_MESSAGE = "本系统永久停止运行";
 
 const app = document.getElementById("app");
 let currentPersona = null;
-let sb = null; // Supabase 客户端实例，boot() 里初始化
+let sb = null;
 
-// ---------- 工具函数 ----------
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -90,7 +82,6 @@ async function sha256Hex(text) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-// 尽量拿访客自己的公网 IP；myip.ipip.net 是国内可访问的服务，失败则记 unknown
 async function fetchPublicIP() {
   try {
     const ctrl = new AbortController();
@@ -110,28 +101,14 @@ async function logAccess(path) {
   try {
     const ip = await fetchPublicIP();
     await sb.from("accesses").insert([{ ip: ip, path: path }]);
-  } catch (err) {
-    // 记录失败不影响正常使用
-  }
+  } catch (err) {}
 }
 
-// ---------- Supabase 查询 ----------
 async function getPasscodeHash() {
   const { data, error } = await sb
     .from("config").select("value").eq("key", "passcode_hash").maybeSingle();
   if (error || !data) return null;
   return data.value;
-}
-
-async function assignPersona() {
-  const { data } = await sb.from("messages").select("persona_id");
-  const counts = new Array(PERSONAS.length).fill(0);
-  for (const m of data || []) {
-    if (m.persona_id >= 0 && m.persona_id < PERSONAS.length) counts[m.persona_id]++;
-  }
-  const min = Math.min(...counts);
-  const choices = counts.map((c, i) => c === min ? i : -1).filter(i => i >= 0);
-  return choices[Math.floor(Math.random() * choices.length)];
 }
 
 async function checkPasscode(input) {
@@ -146,47 +123,39 @@ async function loadMessages() {
     .from("messages").select("persona_id, content, created_at")
     .order("id", { ascending: false }).limit(100);
   if (error) {
-    el.innerHTML = '<div class="empty">加载留言失败，请稍后重试。</div>';
+    el.innerHTML = '<div class="empty">加载公告失败，请稍后重试。</div>';
     return;
   }
-  const rows = (data || []).slice().reverse(); // 新的在下面，和原来一样
+
+  const rows = (data || []).slice().reverse();
   const html = rows.map(m => {
-    const p = PERSONAS[m.persona_id] || PERSONAS[0];
+    const isAdmin = m.content === ADMIN_MESSAGE;
+    const name = isAdmin ? "管理员" : (PERSONAS[m.persona_id] || PERSONAS[0])[0];
+    const avatar = isAdmin ? "⚠️" : (PERSONAS[m.persona_id] || PERSONAS[0])[1];
     return `<article class="message"><div class="message-head">
-      <span class="avatar">${p[1]}</span><strong>${escapeHtml(p[0])}</strong>
+      <span class="avatar">${avatar}</span><strong>${escapeHtml(name)}</strong>
       <time>${escapeHtml(formatTime(m.created_at))}</time>
     </div><p>${escapeHtml(m.content)}</p></article>`;
-  }).join("") || '<div class="empty">还没有留言，写下第一句吧。</div>';
+  }).join("") || renderAdminMessageOnly();
   el.innerHTML = html;
 }
 
-async function postMessage(content) {
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const { count, error: countErr } = await sb
-    .from("messages").select("id", { count: "exact", head: true })
-    .eq("persona_id", currentPersona).gte("created_at", startOfDay);
-  if (countErr) return { ok: false, error: "查询失败，请稍后重试。" };
-  if (count >= DAILY_MESSAGE_LIMIT) {
-    return { ok: false, error: `今天已经发布 ${DAILY_MESSAGE_LIMIT} 条留言，请明天再来。` };
-  }
-  const { error } = await sb
-    .from("messages").insert([{ persona_id: currentPersona, content: content.slice(0, 500) }]);
-  if (error) return { ok: false, error: "发布失败：" + error.message };
-  return { ok: true };
+function renderAdminMessageOnly() {
+  return `<article class="message"><div class="message-head">
+    <span class="avatar">⚠️</span><strong>管理员</strong>
+  </div><p>${ADMIN_MESSAGE}</p></article>`;
 }
 
-// ---------- 页面渲染 ----------
 function renderGate() {
   app.innerHTML = `
     <main class="gate"><section class="card">
-      <div class="avatar" style="margin:0 auto 16px">📮</div>
-      <h1>留言板</h1>
-      <p>输入访问口令后，系统会自动分配一个显示昵称。同一浏览器再次访问时会保留该昵称。</p>
+      <div class="avatar" style="margin:0 auto 16px">⚠️</div>
+      <h1>系统停止运行</h1>
+      <p>输入访问口令后，可查看最终公告。留言功能已经关闭。</p>
       <form id="gate-form">
         <label for="passcode">访问口令</label>
         <input id="passcode" type="password" inputmode="numeric" required autofocus>
-        <button type="submit">进入</button>
+        <button type="submit">查看公告</button>
       </form>
       <div id="gate-error" class="error" hidden></div>
     </section></main>`;
@@ -194,26 +163,18 @@ function renderGate() {
 }
 
 async function renderBoard() {
-  const [name, avatar] = PERSONAS[currentPersona];
   app.innerHTML = `
     <main><section class="card">
-      <header class="identity"><span class="avatar">${avatar}</span><div>
-        <h2>${escapeHtml(name)}</h2><small>当前显示昵称</small>
+      <header class="identity"><span class="avatar">⚠️</span><div>
+        <h2>管理员公告</h2><small>留言功能已关闭</small>
       </div></header>
-      <form id="post-form" class="composer">
-        <label for="content">留下一句话</label>
-        <textarea id="content" maxlength="500" placeholder="今天想说点什么？" required></textarea>
-        <button type="submit">发布留言</button>
-      </form>
-      <div id="post-error" class="error" hidden></div>
-      <p class="hint">每个显示昵称每天最多发布 ${DAILY_MESSAGE_LIMIT} 条。留言保存在云端数据库。</p>
-      <div id="messages"><div class="busy">加载留言中…</div></div>
+      <div class="notice">本系统永久停止运行</div>
+      <p class="hint">页面仅保留最终公告，不再接受新的留言。</p>
+      <div id="messages"><div class="busy">加载公告中…</div></div>
     </section></main>`;
-  document.getElementById("post-form").addEventListener("submit", onPostSubmit);
   await loadMessages();
 }
 
-// ---------- 事件 ----------
 async function onGateSubmit(e) {
   e.preventDefault();
   const btn = e.target.querySelector("button");
@@ -227,45 +188,22 @@ async function onGateSubmit(e) {
     btn.disabled = false;
     return;
   }
-  const pid = await assignPersona();
-  localStorage.setItem("guestbook_persona", String(pid));
-  currentPersona = pid;
+  localStorage.setItem("guestbook_persona", "0");
+  currentPersona = 0;
   await renderBoard();
 }
 
-async function onPostSubmit(e) {
-  e.preventDefault();
-  const btn = e.target.querySelector("button");
-  const ta = document.getElementById("content");
-  const content = ta.value.trim();
-  if (!content) return;
-  btn.disabled = true;
-  const errEl = document.getElementById("post-error");
-  errEl.hidden = true;
-  const res = await postMessage(content);
-  if (!res.ok) {
-    errEl.textContent = res.error;
-    errEl.hidden = false;
-    btn.disabled = false;
-    return;
-  }
-  ta.value = "";
-  btn.disabled = false;
-  await loadMessages();
-}
-
-// ---------- 启动 ----------
 async function boot() {
   if (SUPABASE_URL.includes("YOUR-PROJECT") || SUPABASE_ANON_KEY.includes("YOUR-")) {
     app.innerHTML = `<main class="gate"><section class="card">
-      <h1>留言板</h1>
-      <p>还没有配置 Supabase。<br>请打开本页面的 index.html 源码顶部「配置区」，填入你的 Project URL 和 anon 公钥，再部署。</p>
+      <h1>系统停止运行</h1>
+      <p>还没有配置 Supabase。</p>
     </section></main>`;
     return;
   }
   if (typeof supabase === "undefined") {
     app.innerHTML = `<main class="gate"><section class="card">
-      <h1>留言板</h1><p>加载 Supabase 客户端失败，可能是 CDN 被网络屏蔽，请稍后重试。</p>
+      <h1>系统停止运行</h1><p>加载 Supabase 客户端失败，可能是 CDN 被网络屏蔽，请稍后重试。</p>
     </section></main>`;
     return;
   }
@@ -274,8 +212,8 @@ async function boot() {
   logAccess(location.pathname || "/");
 
   const stored = localStorage.getItem("guestbook_persona");
-  if (stored != null && PERSONAS[+stored]) {
-    currentPersona = +stored;
+  if (stored != null) {
+    currentPersona = 0;
     await renderBoard();
   } else {
     renderGate();
